@@ -1,0 +1,3 @@
+docker/images/consul-vault-enterprise/binaries/consul*
+docker/images/consul-vault-enterprise/binaries/vault*
+.\#*

@@ -1,0 +1,130 @@
+#+OPTIONS: num:nil toc:nil ^:nil
+#+TITLE: Vault Operations Guide - Challenge 2 - Vault re-key of master key
+
+* Requirements
+- An unsealed Vault from [[./vault-unseal.org][Challenge 1: Vault unseal]].
+
+* Background
+From the [[https://www.vaultproject.io/docs/concepts/seal.html][Vault documentation]]:
+
+#+BEGIN_QUOTE
+In order to prevent any one person from having complete access to the
+system, Vault employs Shamir's Secret Sharing Algorithm. Under this
+process, a secret is divided into a subset of parts such that a subset
+of those parts are needed to reconstruct the original secret. Vault
+makes heavy use of this algorithm as part of the unsealing process.
+
+When a Vault server is first initialized, Vault generates a master key
+and immediately splits this master key into a series of key shares
+following Shamir's Secret Sharing Algorithm. Vault never stores the
+master key, therefore, the only way to retrieve the master key is to
+have a quorum of unseal keys re-generate it.
+
+The master key is used to decrypt the underlying encryption key. Vault
+uses the encryption key to encrypt data at rest in a storage backend
+like the filesystem or Consul.
+
+Typically each of these key shares is distributed to trusted parties
+in the organization. These parties must come together to "unseal" the
+Vault by entering their key share.
+#+END_QUOTE
+
+#+CAPTION: Visualization of Shamir's Secret Sharing of the Vault master key
+[[./images/shamirs.svg]]
+
+* The Challenge
+Estimated time to complete this challenge: 10 mins
+
+In our [[./vault-init.org][Vault init]] Challenge we initialized Vault with a single key
+share shard. In our [[./vault-unseal.org][Vault unseal]] Challenge we then unsealed Vault with
+that single shard. As has been said previously, that's fine for a
+learning environment but based on the Background inforamtion in this
+challenge we know its best practice to split and distribute the master
+key as multiple shared As such we are now going to:
+
+- re-key Vault to have a new master key 
+  - with 3 key shares/shards
+  - with an unseal key threshold of 2 keys shares/shards
+
+In this Challenge we will not cover [[https://www.vaultproject.io/docs/vault-enterprise/hsm/][VaultEnterprise's support for
+HSM-based sealing/unsealing]] though that is common practice in
+production Vault Enterprise deployments.
+
+First we initialize the re-keying operation:
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+export VAULT_ADDR=http://localhost:8200
+vault rekey -init -key-shares=3 -key-threshold=2
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+
+WARNING: If you lose the keys after they are returned to you, there is no
+recovery. Consider using the '-pgp-keys' option to protect the returned unseal
+keys along with '-backup=true' to allow recovery of the encrypted keys in case
+of emergency. They can easily be deleted at a later time with
+'vault rekey -delete'.
+
+Nonce: 72bf1e79-e883-3a70-25f9-77124fef110e
+Started: true
+Key Shares: 3
+Key Threshold: 2
+Rekey Progress: 0
+Required Keys: 1
+#+end_example
+
+Next 
+
+Next we feed the generated nonce and our singule unseal key from our previous
+Challenge to the 'rekey' operation:
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+vault rekey -nonce=72bf1e79-e883-3a70-25f9-77124fef110e ZP5LsBZ4DHoYgMDq4gDww+niGXOyLsQ8QV3OL3lpQb0=
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+Key 1: nZKx03/BmO0SMp86k9AUpazDKNf+mp4DD2NnGN49Rb6s
+Key 2: 3njFeCbUeN/bs1nSdY3ZTdDa8o9NAKiNqsifWXEgUdsV
+Key 3: 2As4nzBe51KQW4gzR6StrFMRntAosRr/ni+CzanUkpOc
+
+Operation nonce: 72bf1e79-e883-3a70-25f9-77124fef110e
+
+Vault rekeyed with 3 keys and a key threshold of 2. Please
+securely distribute the above keys. When the vault is re-sealed,
+restarted, or stopped, you must provide at least 2 of these keys
+to unseal it again.
+
+Vault does not store the master key. Without at least 2 keys,
+your vault will remain permanently sealed.
+#+end_example
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+vault status
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+Sealed: false
+Key Shares: 3
+Key Threshold: 2
+Unseal Progress: 0
+Unseal Nonce: 
+Version: 0.8.1+ent
+Cluster Name: vault-cluster-db89dd22
+Cluster ID: 24e469e7-ce5a-c5f4-cdda-4d45b2fa69ea
+
+High-Availability Enabled: true
+	Mode: active
+	Leader Cluster Address: https://172.21.0.2:8201
+#+end_example
+
+In a production deployment you should distribute the keys above to
+trusted entities within your org with each entity receiving one _and
+only one_ shard. For our learning lab purposes you should record the
+nonce and keys somewhere where you will not forget them as we will use
+them later.
+
+* Next Challenge
+[[./vault-rotate.org][Vault rotate]]

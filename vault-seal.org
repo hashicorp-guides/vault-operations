@@ -1,0 +1,64 @@
+#+OPTIONS: num:nil toc:nil ^:nil
+#+TITLE: Vault Operations Guide - Challenge 4 - Vault seal
+
+* Requirements
+- An unsealed Vault from [[./vault-unseal.org][Challenge 1: Vault unseal, ]][[./vault-retoken.org][Challenge 2: Vault re-token]], or [[./vault-rotate][Challenge 3: Vault rotate]].
+  
+* Background
+From the [[https://www.vaultproject.io/docs/concepts/seal.html][Vault documentation]]:
+
+#+BEGIN_QUOTE
+If there is a detected intrusion, the Vault data can be locked quickly
+to try to minimize damages. It can't be accessed again without access
+to the master key shards.
+
+There is also an API to seal the Vault. This will throw away the
+master key and require another unseal process to restore it. Sealing
+only requires a single operator with root privileges.
+#+END_QUOTE
+
+* The Challenge
+Estimated time to complete this challenge: 2 mins
+
+Sealing Vault required admin-level privileges thus we will auth using
+the root token and then perform te seal operation:
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+export VAULT_ADDR=http://localhost:8200
+vault auth b2ba6ccc-1eab-f65b-cf0b-c28f45e15d0d
+vault seal
+#+END_SRC
+
+#+RESULTS:
+: 
+: Successfully authenticated! You are now logged in.
+: token: b2ba6ccc-1eab-f65b-cf0b-c28f45e15d0d
+: token_duration: 0
+: token_policies: [root]
+: Vault is now sealed.
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+vault status
+#+END_SRC
+
+#+RESULTS:
+: Sealed: true
+: Key Shares: 3
+: Key Threshold: 2
+: Unseal Progress: 0
+: Unseal Nonce: 
+: Version: 0.8.1+ent
+: 
+: High-Availability Enabled: true
+: 	Mode: sealed
+
+Sealing Vault is a reversible operation. Once Vault is sealed no
+additionl secrets management operations will be possible until Vault
+is unsealed. The incident response team can review log data sent to
+the Vault [[https://www.vaultproject.io/docs/audit/index.html][Audit Backends]] to plan their incident response which may
+involve revoking token, sub-tokens, and other secrets.
+
+* Next Challenge
+
+There is none! Congratulations, you have earned the totally imaginary
+"Vault Operations Guide" Internet merit badge. ;)

@@ -1,0 +1,71 @@
+#+OPTIONS: num:nil toc:nil ^:nil
+#+TITLE: Vault Operations Guide - Challenge 3 - Vault rotate
+
+* Requirements
+- An unsealed Vault from [[./vault-unseal.org][Challenge 1: Vault unseal]] or [[./vault-retoken.org][Challenge 2: Vault re-token]].
+
+* Background
+From the [[https://www.vaultproject.io/docs/internals/rotation.html][Vault documentation]]:
+
+#+BEGIN_QUOTE
+The rotate operation is used to change the encryption key used to
+protect data written to the storage backend. This key is never
+provided or visible to operators, who only have unseal keys. This
+simplifies the rotation, as it does not require the current key
+holders unlike the rekey operation. When rotate is triggered, a new
+encryption key is generated and added to a keyring. All new values
+written to the storage backend are encrypted with the new key. Old
+values written with previous encryption keys can still be decrypted
+since older keys are saved in the keyring. This allows key rotation to
+be done online, without an expensive re-encryption process.
+#+END_QUOTE
+
+* The Challenge
+Estimated time to complete this challenge: 5 mins
+
+A master key rotate does not require a quorum of Vault administrators
+but _does_ require admin-level access to Vault. In this case, we will
+auth to Vault as the Initial Root Token to gain that admin-level
+access:
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+export VAULT_ADDR=http://localhost:8200
+vault auth b2ba6ccc-1eab-f65b-cf0b-c28f45e15d0d
+vault rotate
+#+END_SRC
+
+#+RESULTS:
+: 
+: Successfully authenticated! You are now logged in.
+: token: b2ba6ccc-1eab-f65b-cf0b-c28f45e15d0d
+: token_duration: 0
+: token_policies: [root]
+: Key Term: 2
+: Installation Time: 2017-09-01 18:57:29.783344928 +0000 UTC
+
+There's little to indicate it in the output but we have sucessfully
+rotated the Vault master key. The new master key will now be used to
+encrypt/decrypt secrets written to the securre storage.
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+vault status
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+Sealed: false
+Key Shares: 3
+Key Threshold: 2
+Unseal Progress: 0
+Unseal Nonce: 
+Version: 0.8.1+ent
+Cluster Name: vault-cluster-dad3962f
+Cluster ID: 326e72ba-3310-6d5f-bea4-0aeb6733f72a
+
+High-Availability Enabled: true
+	Mode: active
+	Leader Cluster Address: https://172.21.0.2:8201
+#+end_example
+
+* Next Challenge
+[[./vault-seal.org][Vault seal]]

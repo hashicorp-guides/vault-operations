@@ -1,0 +1,133 @@
+#+OPTIONS: num:nil toc:nil ^:nil
+#+TITLE: Vault Operations Guide - Challenge 0 - Vault init
+
+* Requirements
+- Provisioned environment from [[./README.org][Vault Operations Guide]].
+
+* Background
+From the [[https://www.vaultproject.io/intro/getting-started/deploy.html][Vault documentation]]:
+
+#+BEGIN_QUOTE
+Initialization is the process of first configuring the Vault. This
+only happens once when the server is started against a new backend
+that has never been used with Vault before.
+
+During initialization, the encryption keys are generated, unseal keys
+are created, and the initial root token is setup. To initialize Vault
+use vault init. This is an unauthenticated request, but it only works
+on brand new Vaults with no data:
+#+END_QUOTE
+
+* The Challenge
+Estimated time to complete this challenge: 5min
+
+We can observe the state of Vault via the Vault UI at [[http://localhost:8200][http://localhost:8200]] or via the Vault
+command-line:
+
+#+CAPTION: Vault UI showing uninitialized status
+#+NAME: Vault-UI-uninitialized
+[[./images/vault-initial.png]]
+
+-----
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+export VAULT_ADDR=http://localhost:8200
+vault status
+#+END_SRC
+
+#+RESULTS:
+: 
+: Error checking seal status: Error making API request.
+: 
+: URL: GET http://localhost:8200/v1/sys/seal-status
+: Code: 400. Errors:
+: 
+: * server is not yet initialized
+
+Before we proceed to the next step, initializing Vault, its useful to
+note that Vault command-line utility we've been using is actually a
+very thin wrapper around the actual [[https://www.vaultproject.io/api/system/init.html][Vault API]]. For instance, in the
+last step we could have just as easily done:
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+curl http://localhost:8200/v1/sys/init
+#+END_SRC
+
+#+RESULTS:
+: {"initialized":false}
+
+This is true for the remainder of the operations in this Challenge as
+well as other Challenges in this series. For more information about
+interacting with the Vault API please refer to the
+[[https://www.vaultproject.io/api/index.html][Vault API docs]].
+
+Because we are working in a learning environment, we will initialize
+Vault with only a [[https://www.vaultproject.io/docs/concepts/seal.html][single seal/unseal key]]. This is very much a
+configuration which is only appropriate for a learning environment.
+In production you'll want to either:
+
+- initliaze with multiple [[https://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing][Shamir's Secret Sharing]] key shards
+- initialize using a [[https://en.wikipedia.org/wiki/Hardware_security_module][Hardware Security Module]]
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+vault init -key-shares=1 -key-threshold=1
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+Unseal Key 1: ZP5LsBZ4DHoYgMDq4gDww+niGXOyLsQ8QV3OL3lpQb0=
+Initial Root Token: b2ba6ccc-1eab-f65b-cf0b-c28f45e15d0d
+
+Vault initialized with 1 keys and a key threshold of 1. Please
+securely distribute the above keys. When the vault is re-sealed,
+restarted, or stopped, you must provide at least 1 of these keys
+to unseal it again.
+
+Vault does not store the master key. Without at least 1 keys,
+your vault will remain permanently sealed.
+#+end_example
+
+You'll want to record both the "Unseal Key" and "Initial Root Token"
+from the output above. In a production deployment it is crucial that
+you protect unseal keys and root tokens.  For our purposes record them
+somewhere where you won't lose them as we'll be using them in the next
+Challenge.
+
+Note how the output of the 'vault status' command has now changed:
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+vault status
+#+END_SRC
+
+#+RESULTS:
+: Sealed: true
+: Key Shares: 1
+: Key Threshold: 1
+: Unseal Progress: 0
+: Unseal Nonce: 
+: Version: 0.8.1+ent
+: 
+: High-Availability Enabled: true
+: 	Mode: sealed
+
+Also note how the above status is reflected in both the Consul
+Enterprise UI with status "standby" and the Vault Enterprise UI via
+the prompt for an unseal key:
+
+-----
+#+CAPTION: Consul UI showing an initlialized but sealed Vault instance
+[[./images/consul-vault-init.png]]
+-----
+#+CAPTION: Vault UI showing an initialized but sealed Vault instance
+[[./images/vault-initialized.png]]
+-----
+
+In our environment:
+
+1) We have created a root token which you can think of similarly to having set the root password to Vault in that authenticating to Vault with this token gives us full admin-level privileges to make configuration changes to any part of Vault.
+2) We have created a single key share shard which will be used to "unseal" the cryptogtaphic barrier of Vault. (More on this later.)
+3) Our Vault instance is still in an "initialized" but "sealed" state.
+
+* Next Challenge
+That's it for this challenge. Now on to the [[./vault-unseal.org][Vault unseal Challenge]].
+
