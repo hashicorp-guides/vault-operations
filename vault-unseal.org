@@ -1,0 +1,85 @@
+#+OPTIONS: num:nil toc:nil ^:nil
+#+TITLE: Vault Operations Guide - Challenge 1 - Vault unseal
+
+* Requirements
+- An initialized Vault from [[./vault-init.org][Challenge 0: Vault init]].
+
+* Background
+From the [[https://www.vaultproject.io/docs/concepts/seal.html][Vault documentation]]:
+
+#+BEGIN_QUOTE
+When a Vault server is started, it starts in a sealed state. In this
+state, Vault is configured to know where and how to access the
+physical storage, but doesn't know how to decrypt any of it.
+
+Unsealing is the process of constructing the master key necessary to
+read the decryption key to decrypt the data, allowing access to the
+Vault.
+
+Prior to unsealing, almost no operations are possible with Vault. For
+example authentication, managing the mount tables, etc. are all not
+possible. The only possible operations are to unseal the Vault and
+check the status of the unseal.
+#+END_QUOTE
+
+* The Challenge
+Estimated time to complete this challenge:
+- 5 mins of terminal time
+- 10 to 30 mins of reference reading
+
+Let's check the status of our Vault:
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+export VAULT_ADDR=http://localhost:8200
+vault status
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+
+Sealed: true
+Key Shares: 1
+Key Threshold: 1
+Unseal Progress: 0
+Unseal Nonce: 
+Version: 0.8.1+ent
+
+High-Availability Enabled: true
+	Mode: sealed
+#+end_example
+
+From our previous challenge, we have a Vault initialized with a single
+key share and in a sealed state. Hopefully you saved the root token
+and key share from the previous challenge as you'll need the unseal
+key below:
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+vault unseal ZP5LsBZ4DHoYgMDq4gDww+niGXOyLsQ8QV3OL3lpQb0=
+#+END_SRC
+
+#+RESULTS:
+: Sealed: false
+: Key Shares: 1
+: Key Threshold: 1
+: Unseal Progress: 0
+: Unseal Nonce:
+
+Notice how the change from "Sealed: true" to "Sealed: false"? That
+means success! Not only do we have initialized Vault storage (in the
+backend Consul instance) but we have successfully decrypted the key
+which will be required to decrypt/encrypt secrets written to the
+secure storage.
+
+As was pointed out in the previous Challenge, having a single unseal
+key is fine for our learning environment however it is very much not
+fine in an production deployment. Now would be a _perfect_ time to
+review some suggested references.
+
+* Suggested Reference Reading
+- [[https://www.vaultproject.io/docs/concepts/seal.html][Vault Seal/Unseal]]
+- [[https://en.wikipedia.org/wiki/Shamir%27s_Secret_Sharing][Wikipedia's entry for Shamir's Secret Sharing]]
+- [[https://www.vaultproject.io/docs/vault-enterprise/hsm/][Vault Enterprise's support for HSM-based sealing/unsealing]]
+
+
+* Next Challenge
+[[./vault-rekey.org][Vault re-key of master key]].

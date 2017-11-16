@@ -1,0 +1,439 @@
+#+OPTIONS: num:nil toc:nil ^:nil
+#+TITLE: Vault Operations Guide
+
+The goal of this guide is to help users understand and perform Vault's
+basic bootstrapping operations for a single stand-alone Vault
+instance.
+
+Topics covered will include initialization, unseal, re-keying of the
+unseal keys, rotation of the maste encryption key, and sealing.
+
+Scripts and configurations are maintained in the [[https://github.com/hashicorp-guides/vault-operations][Vault operations
+repo]].
+
+#+TOC: headers 2
+
+* Requirements
+
+For most users:
+
+- Git
+- [[https://virtualbox.org][Oracle VirtualBox]]
+- [[https://vagrantup.com][HashiCorp Vagrant]]
+
+For users who are on Linux, are already comfortable with Docker ecosystem tooling and the DevOps toolchain, and who want to be a little adventurous:
+
+- [[https://docker.com][Docker]]
+- [[https://docs.docker.com/compose/][Docker Compose v3]]
+- [[https://www.chef.io/inspec/][Chef InSpec]]
+
+Esstimated time to completion for environment setup: 5 to 15 minutes depending on the speed of your Internet connection.
+
+* Setup of the environment
+** This repo
+#+BEGIN_SRC sh :dir /tmp :exports both :results output
+git clone https://github.com/hashicorp-guides/vault-operations
+cd vault-operations && ls
+#+END_SRC
+
+#+RESULTS:
+: docker
+: images
+: LICENSE
+: README.md
+: scripts
+: Vagrantfile
+: vms
+
+** HashiCorp Enteprise tooling
+First we'll need to download the Vault Enterprise and Consul Enterprise binaries from AWS S3. As part of your license entitlement you should have been provided with the following credential information:
+
+- AWS_ACCESS_KEY_ID
+- AWS_SECRET_ACCESS_KEY
+
+Although you could set the environment variables above with a BASH [[http://www.tldp.org/LDP/Bash-Beginners-Guide/html/Bash-Beginners-Guide.html]['export']], let me take a minute to suggest a nice tool, [[https://github.com/locationlabs/awsenv][awsenv]] for multiplexing AWS credentials in your shell environment.
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+eval $(awsenv hashicorp-enterprise-binaries)
+env | grep AWS | egrep -v 'ACCESS'
+echo "echo of AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY has been suppressed."
+#+END_SRC
+
+#+RESULTS:
+: 
+: AWS_PROFILE=hashicorp-enterprise-binaries
+: AWS_DEFAULT_REGION=us-west-2
+: echo of AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY have been suppressed.
+
+Regardless, before downloading the binaries you'll need to have set your AWS credential information as shell environment variables.
+
+To download the binaries run the bundled script:
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+  ./scripts/download-hashistack-bins.sh
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+Available Consul versions...
+2017-08-09 18:31:54       1322 consul-enterprise_0.9.2+ent_SHA256SUMS
+2017-08-09 18:31:55        310 consul-enterprise_0.9.2+ent_SHA256SUMS.sig
+2017-08-09 18:31:58   10376342 consul-enterprise_0.9.2+ent_darwin_386.zip
+2017-08-09 18:32:02   11109380 consul-enterprise_0.9.2+ent_darwin_amd64.zip
+2017-08-09 18:32:06   10449613 consul-enterprise_0.9.2+ent_freebsd_386.zip
+2017-08-09 18:32:10   11192396 consul-enterprise_0.9.2+ent_freebsd_amd64.zip
+2017-08-09 18:32:14   10523192 consul-enterprise_0.9.2+ent_freebsd_arm.zip
+2017-08-09 18:32:18   10438398 consul-enterprise_0.9.2+ent_linux_386.zip
+2017-08-09 18:32:22   11167105 consul-enterprise_0.9.2+ent_linux_amd64.zip
+2017-08-09 18:32:26   10494229 consul-enterprise_0.9.2+ent_linux_arm.zip
+2017-08-09 18:32:30   10551912 consul-enterprise_0.9.2+ent_linux_arm64.zip
+2017-08-09 18:32:34   11134192 consul-enterprise_0.9.2+ent_solaris_amd64.zip
+2017-08-09 18:32:38   10503029 consul-enterprise_0.9.2+ent_windows_386.zip
+2017-08-09 18:32:42   11253354 consul-enterprise_0.9.2+ent_windows_amd64.zip
+Downloading consul-enterprise_0.9.2+ent_linux_amd64.zip...
+Archive:  /tmp/consul.zip
+  inflating: consul                  
+Available Vault versions...
+2017-08-16 12:02:48          0 
+2017-08-16 12:07:45       1788 vault-enterprise_0.8.1_SHA256SUMS
+2017-08-16 12:07:45        287 vault-enterprise_0.8.1_SHA256SUMS.sig
+2017-08-16 12:07:54   15000887 vault-enterprise_0.8.1_darwin_386.zip
+2017-08-16 12:07:54   16032659 vault-enterprise_0.8.1_darwin_amd64.zip
+2017-08-16 12:07:58   15081727 vault-enterprise_0.8.1_freebsd_386.zip
+2017-08-16 12:07:59   16126162 vault-enterprise_0.8.1_freebsd_amd64.zip
+2017-08-16 12:08:03   15181192 vault-enterprise_0.8.1_freebsd_arm.zip
+2017-08-16 12:08:06   15100003 vault-enterprise_0.8.1_linux_386.zip
+2017-08-16 12:07:32   16121793 vault-enterprise_0.8.1_linux_amd64.zip
+2017-08-16 12:07:32   15172599 vault-enterprise_0.8.1_linux_arm.zip
+2017-08-16 12:07:34   15213073 vault-enterprise_0.8.1_linux_arm64.zip
+2017-08-16 12:07:35   15073833 vault-enterprise_0.8.1_netbsd_386.zip
+2017-08-16 12:07:37   16116532 vault-enterprise_0.8.1_netbsd_amd64.zip
+2017-08-16 12:07:37   15172843 vault-enterprise_0.8.1_netbsd_arm.zip
+2017-08-16 12:07:40   15076663 vault-enterprise_0.8.1_openbsd_386.zip
+2017-08-16 12:07:42   16120670 vault-enterprise_0.8.1_openbsd_amd64.zip
+2017-08-16 12:07:45   16114575 vault-enterprise_0.8.1_solaris_amd64.zip
+2017-08-16 12:07:49   15016676 vault-enterprise_0.8.1_windows_386.zip
+2017-08-16 12:07:49   16066830 vault-enterprise_0.8.1_windows_amd64.zip
+Downloading vault-enterprise_0.8.1_linux_amd64.zip...
+Archive:  /tmp/vault.zip
+  inflating: vault
+#+end_example
+
+** Provision the environment
+*** For Vagrant users
+For most users, the Vagrant command below will:
+
+1) Launch a Vagrant VM
+2) Launch a Consul Enterprise container which will act as secure storage for the Vault Enterprise container
+3) Launch the Vault Enterprise container
+4) Run a test suite to validate the environment before we proceed
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+vagrant up
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+Bringing machine 'dockerhost' up with 'virtualbox' provider...
+dockerhost: Checking if box 'ubuntu/xenial64' is up to date...
+dockerhost: Clearing any previously set forwarded ports...
+dockerhost: Clearing any previously set network interfaces...
+dockerhost: Preparing network interfaces based on configuration...
+    dockerhost: Adapter 1: nat
+dockerhost: Forwarding ports...
+8500 (host) (adapter 1)
+8200 (host) (adapter 1)
+2222 (host) (adapter 1)
+dockerhost: Running 'pre-boot' VM customizations...
+dockerhost: Booting VM...
+dockerhost: Waiting for machine to boot. This may take a few minutes...
+    dockerhost: SSH address: 127.0.0.1:2222
+    dockerhost: SSH username: ubuntu
+    dockerhost: SSH auth method: password
+dockerhost: Machine booted and ready!
+dockerhost: Checking for guest additions in VM...
+    dockerhost: The guest additions on this VM do not match the installed version of
+    dockerhost: VirtualBox! In most cases this is fine, but in rare cases it can
+    dockerhost: prevent things such as shared folders from working properly. If you see
+    dockerhost: shared folder errors, please make sure the guest additions within the
+    dockerhost: virtual machine match the version of VirtualBox you have installed on
+    dockerhost: your host and reload your VM.
+    dockerhost: 
+    dockerhost: Guest Additions Version: 5.0.40
+    dockerhost: VirtualBox Version: 5.1
+dockerhost: Mounting shared folders...
+/home/nrvale0/workspace/github/hashicorp-guides/vault-operations
+dockerhost: Running provisioner: docker...
+dockerhost: Running provisioner: shell...
+    dockerhost: Running: /tmp/vagrant-shell20170828-18071-1wpman7.sh
+dockerhost: Provisioning the Docker host...
+dockerhost: Make dockerd available on all tcp/2375 on all interfaces...
+dockerhost: + mkdir -p /etc/systemd/system/docker.service.d
+dockerhost: + printf '[Service]\nExecStart=\nExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:2375\n'
+dockerhost: + systemctl daemon-reload
+dockerhost: + service docker restart
+dockerhost: Running provisioner: shell...
+    dockerhost: Running: /tmp/vagrant-shell20170828-18071-1a0vr6n.sh
+dockerhost: >>>> Validating the Docker host...
+dockerhost: + RUBYOPT=-W0
+dockerhost: + inspec exec vms/dockerhost/validate.d/inspec
+dockerhost:
+dockerhost: Profile: tests from vms/dockerhost/validate.d/inspec
+dockerhost: Version: (not specified)
+dockerhost: Target:  local://
+dockerhost:
+dockerhost:
+dockerhost:   Service docker
+dockerhost:      ✔  should be installed
+dockerhost:      ✔  should be running
+dockerhost:   Bash command
+dockerhost:      ✔  docker-compose version exit_status should eq 0
+dockerhost:
+dockerhost: Test Summary: [38;5;41m3 successful, 0 failures, 0 skipped
+dockerhost: Running provisioner: shell...
+    dockerhost: Running: /tmp/vagrant-shell20170828-18071-p08wf7.sh
+dockerhost: Provisioning Vault Enterprise via Docker Compose...
+dockerhost: + cd docker/compose/vault-enterprise-basic
+dockerhost: + docker-compose up --build -d
+dockerhost: Building consul-enterprise0
+dockerhost: Step 1/12 : FROM krallin/ubuntu-tini:xenial
+dockerhost:  ---> ec5cd99cee21
+dockerhost: Step 2/12 : ENV TERM ansi DEBIAN_FRONTEND noninteractive DEBCONF_NONINTERACTIVE_SEEN true
+dockerhost:  ---> Using cache
+dockerhost:  ---> bc90954c150d
+dockerhost: Step 3/12 : ENV PATH /opt/puppetlabs/bin:/bin/:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
+dockerhost:  ---> Using cache
+dockerhost:  ---> 8fbec4549e2a
+dockerhost: Step 4/12 : RUN apt-get update
+dockerhost:  ---> Using cache
+dockerhost:  ---> 43ef8d84c494
+dockerhost: Step 5/12 : RUN apt-get upgrade -y
+dockerhost:  ---> Using cache
+dockerhost:  ---> b5e4222dbba6
+dockerhost: Step 6/12 : RUN apt-get install -y libltdl7 wget curl httpie iproute2 &&     apt-get clean all &&     rm -rf /var/cache/apt
+dockerhost:  ---> Using cache
+dockerhost:  ---> 39b4a8745a5f
+dockerhost: Step 7/12 : COPY ./binaries/consul /usr/local/bin/consul
+dockerhost:  ---> Using cache
+dockerhost:  ---> c0c95888f314
+dockerhost: Step 8/12 : RUN mkdir -p /etc/hashicorp/vault
+dockerhost:  ---> Using cache
+dockerhost:  ---> ea431b91e865
+dockerhost: Step 9/12 : COPY ./config/etc/hashicorp/vault/config.hcl /etc/hashicorp/vault/config.hcl
+dockerhost:  ---> Using cache
+dockerhost:  ---> f584907a5305
+dockerhost: Step 10/12 : COPY ./binaries/vault /usr/local/bin/vault
+dockerhost:  ---> Using cache
+dockerhost:  ---> 0842fc1bd78d
+dockerhost: Step 11/12 : ENTRYPOINT /usr/local/bin/tini -- /usr/local/bin/vault server -config /etc/hashicorp/vault/config.hcl
+dockerhost:  ---> Using cache
+dockerhost:  ---> f17f5fe7fedc
+dockerhost: Step 12/12 : COPY Dockerfile /Dockerfile
+dockerhost:  ---> Using cache
+dockerhost:  ---> a9ddde3f83bd
+dockerhost: Successfully built a9ddde3f83bd
+dockerhost: Successfully tagged local/consul-vault-enterprise:latest
+dockerhost: Building vault-enterprise0
+dockerhost: Step 1/12 : FROM krallin/ubuntu-tini:xenial
+dockerhost:  ---> ec5cd99cee21
+dockerhost: Step 2/12 : ENV TERM ansi DEBIAN_FRONTEND noninteractive DEBCONF_NONINTERACTIVE_SEEN true
+dockerhost:  ---> Using cache
+dockerhost:  ---> bc90954c150d
+dockerhost: Step 3/12 : ENV PATH /opt/puppetlabs/bin:/bin/:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
+dockerhost:  ---> Using cache
+dockerhost:  ---> 8fbec4549e2a
+dockerhost: Step 4/12 : RUN apt-get update
+dockerhost:  ---> Using cache
+dockerhost:  ---> 43ef8d84c494
+dockerhost: Step 5/12 : RUN apt-get upgrade -y
+dockerhost:  ---> Using cache
+dockerhost:  ---> b5e4222dbba6
+dockerhost: Step 6/12 : RUN apt-get install -y libltdl7 wget curl httpie iproute2 &&     apt-get clean all &&     rm -rf /var/cache/apt
+dockerhost:  ---> Using cache
+dockerhost:  ---> 39b4a8745a5f
+dockerhost: Step 7/12 : COPY ./binaries/consul /usr/local/bin/consul
+dockerhost:  ---> Using cache
+dockerhost:  ---> c0c95888f314
+dockerhost: Step 8/12 : RUN mkdir -p /etc/hashicorp/vault
+dockerhost:  ---> Using cache
+dockerhost:  ---> ea431b91e865
+dockerhost: Step 9/12 : COPY ./config/etc/hashicorp/vault/config.hcl /etc/hashicorp/vault/config.hcl
+dockerhost:  ---> Using cache
+dockerhost:  ---> f584907a5305
+dockerhost: Step 10/12 : COPY ./binaries/vault /usr/local/bin/vault
+dockerhost:  ---> Using cache
+dockerhost:  ---> 0842fc1bd78d
+dockerhost: Step 11/12 : ENTRYPOINT /usr/local/bin/tini -- /usr/local/bin/vault server -config /etc/hashicorp/vault/config.hcl
+dockerhost:  ---> Using cache
+dockerhost:  ---> f17f5fe7fedc
+dockerhost: Step 12/12 : COPY Dockerfile /Dockerfile
+dockerhost:  ---> Using cache
+dockerhost:  ---> a9ddde3f83bd
+dockerhost: Successfully built a9ddde3f83bd
+dockerhost: Successfully tagged local/consul-vault-enterprise:latest
+dockerhost: Starting consul-enterprise0 ...
+dockerhost: Starting consul-enterprise0
+dockerhost: Starting consul-enterprise0 ... done
+dockerhost: Starting vault-enterprise0 ...
+dockerhost: Starting vault-enterprise0
+dockerhost: Starting vault-enterprise0 ... done
+dockerhost: Running provisioner: shell...
+    dockerhost: Running: /tmp/vagrant-shell20170828-18071-15dl1k2.sh
+dockerhost:
+dockerhost: >>>> Validating Vault Enterprise via InSpec...
+dockerhost:
+dockerhost: >>>> Validating containers...
+dockerhost:
+dockerhost: Profile: tests from docker/compose/vault-enterprise-basic/validate.d/inspec/containers.rb
+dockerhost: Version: (not specified)
+dockerhost: Target:  local://
+dockerhost:   Docker Container
+dockerhost:      ✔  consul-enterprise0 should exist
+dockerhost:      ✔  consul-enterprise0 should be running
+dockerhost:   Docker Container
+dockerhost:      ✔  vault-enterprise0 should exist
+dockerhost:      ✔  vault-enterprise0 should be running
+dockerhost: Test Summary:  successful, 0 failures, 0 skipped
+dockerhost:
+dockerhost: >>>> Validating Consul...
+dockerhost:
+dockerhost: Profile: tests from docker/compose/vault-enterprise-basic/validate.d/inspec/consul.rb
+dockerhost: Version: (not specified)
+dockerhost: Target:  local://
+dockerhost:   http GET
+dockerhost:      ✔  on http://172.18.0.2:8500/v1/status/leader status should cmp == 200
+dockerhost:   http GET
+dockerhost:      ✔  on http://172.18.0.2:8500/v1/status/peers status should cmp == 200
+dockerhost: Test Summary:  successful, 0 failures, 0 skipped
+dockerhost:
+dockerhost: >>>> Validating Vault...
+dockerhost:
+dockerhost: Profile: tests from docker/compose/vault-enterprise-basic/validate.d/inspec/vault.rb
+dockerhost: Version: (not specified)
+dockerhost: Target:  local://
+dockerhost:
+dockerhost:   http GET
+dockerhost:      ✔  on http://172.18.0.3:8200/v1/sys/leader status should cmp == 503
+dockerhost: Test Summary:  successful, 0 failures, 0 skipped
+dockerhost: Machine 'dockerhost' has a post `vagrant up` message. This is a message
+dockerhost: from the creator of the Vagrantfile, and not from Vagrant itself:
+dockerhost:
+dockerhost: If you see a bunch of successful tests above, congrats you have a Vault demo enviornment.
+dockerhost: Please check:
+dockerhost:
+dockerhost: https://github.com/hashicorp-guides/vault-operations
+dockerhost:
+dockerhost: for more information. You can access the Consul and Vault Enterprise UI's at:
+dockerhost:
+dockerhost: http://localhost:8500 # Consul
+dockerhost: http://localhost:8200 # Vault
+dockerhost:
+dockerhost: Enjoy!
+dockerhost:
+dockerhost:                                 - HashiCorp Solutions Engineering
+#+end_example
+*** For Docker users
+For Docker users, the following commands provide a similar result as the above Vagrant-based deployment without introducing the overhead of a virtual machine and instead deploying into the locally installed Docker daemon:
+
+#+BEGIN_SRC sh :exports both :results output :session bash
+  (cd docker/compose/vault-enterprise-basic && \
+       docker-compose up -d && \
+       RUBYOPT=-W0 inspec exec validate.d/inspec)
+  export VAULT_ADDR=http://localhost:8200
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+
+> Starting consul-enterprise0 ... 
+Starting consul-enterprise0
+AKStarting consul-enterprise0 ... doneBStarting vault-enterprise0 ... 
+Starting vault-enterprise0
+AKStarting vault-enterprise0 ... doneB
+Profile: tests from validate.d/inspec
+Version: (not specified)
+Target:  local://
+
+
+  http GET
+     ✔  on http://172.21.0.3:8200/v1/sys/leader status should cmp == 503
+  http GET
+     ✔  on http://172.21.0.2:8500/v1/status/leader status should cmp == 200
+  http GET
+     ✔  on http://172.21.0.2:8500/v1/status/peers status should cmp == 200
+  Docker Container
+     ✔  consul-enterprise0 should exist
+     ✔  consul-enterprise0 should be running
+  Docker Container
+     ✔  vault-enterprise0 should exist
+     ✔  vault-enterprise0 should be running
+
+Test Summary:  successful,  failures,  skipped
+#+end_example
+
+** Starting/stopping the environment
+It's not expected that you will work through the entire Vault
+Operations Guide in one sitting. One might even argue it's not optimal
+to do so.  Along those lines, you can stop/start and destroy/recreate
+the learning environment like so:
+*** For Vagrant users
+Start/stop:
+#+BEGIN_SRC sh :exports both :results output :session bash
+vagrant suspend
+vagrant start
+#+END_SRC
+
+Destroy/create:
+#+BEGIN_SRC sh :exports both :results output :session bash
+vagrant destroy -f
+vagrant up
+#+END_SRC
+
+*** For Docker users
+Start/stop:
+#+BEGIN_SRC sh :exports both :results output :session bash
+  (cd docker/compose/vault-enteprise-basic && \
+       docker-compose stop && \
+       docker-compose start && \
+       inspec exec validate.d/inspec)
+#+END_SRC
+
+Destroy/create:
+#+BEGIN_SRC sh :exports both :results output :session bash
+  (cd docker/compose/vault-enteprise-basic && \
+       docker-compose down -v && \
+       docker-compose up -d --build && \
+       inspec exec validate.d/inspec)
+#+END_SRC
+
+* Validation of the environment
+
+Regardless of the path you took for provisioning of the environment a clean run will result in:
+
+| Servce | URL                   |
+|--------+-----------------------|
+| Consul | [[http://localhost:8500][http://localhost:8500]] |
+| Vault  | [[http://localhost:8200][http://localhost:8200]] |
+
+Go ahead and hit each of the URLs above. 
+
+Consul UI
+-----
+#+CAPTION: Consul UI
+[[./images/consul-initial-healthy.png]]
+-----
+
+Vault UI
+-----
+#+CAPTION: Vault UI
+[[./images/vault-initial.png]]
+-----
+
+Congratulations, if you've gotten this far you now have a basic working Vault cluster. Now on to the Challenges:
+
+* Challenges
+- Challenge 0: [[vault-init.org][Vault init]]
+- Challenge 1: [[./vault-unseal.org][Vault unseal]]
+- Challenge 2: [[vault-rekey.org][Vault re-key of master key]]
+- Challenge 3: [[./vault-rotate.org][Vault rotate]]
+- Challenge 4: [[./vault-seal][Vault seal]]

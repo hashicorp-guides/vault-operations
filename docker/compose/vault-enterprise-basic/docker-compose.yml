@@ -1,0 +1,30 @@
+version: '3'
+
+services:
+
+  consul-enterprise0:
+    build: ../../images/consul-vault-enterprise
+    image: local/consul-vault-enterprise
+    hostname: consul-enterprise0
+    container_name: consul-enterprise0
+    entrypoint: >-
+      /usr/local/bin/tini -- /usr/local/bin/consul agent -server -ui -data-dir /var/hashicorp/consul
+      -disable-host-node-id -client 0.0.0.0 -raft-protocol 3 -bootstrap-expect 1
+    ports:
+      - "8500:8500"
+      - "8600:8600"
+
+  vault-enterprise0:
+    build: ../../images/consul-vault-enterprise
+    image: local/consul-vault-enterprise
+    hostname: vault-enterprise0
+    container_name: vault-enterprise0
+    ports:
+      - "8200:8200"
+    entrypoint: >-
+      /usr/local/bin/tini -- /usr/local/bin/vault server -config /etc/hashicorp/vault/config.hcl -log-level=debug
+
+    links:
+      - consul-enterprise0
+    cap_add:
+      - IPC_LOCK
