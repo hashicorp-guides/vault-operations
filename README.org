@@ -6,7 +6,7 @@ basic bootstrapping operations for a single stand-alone Vault
 instance.
 
 Topics covered will include initialization, unseal, re-keying of the
-unseal keys, rotation of the maste encryption key, and sealing.
+unseal keys, rotation of the master encryption key, and sealing.
 
 Scripts and configurations are maintained in the [[https://github.com/hashicorp-guides/vault-operations][Vault operations
 repo]].
@@ -27,7 +27,7 @@ For users who are on Linux, are already comfortable with Docker ecosystem toolin
 - [[https://docs.docker.com/compose/][Docker Compose v3]]
 - [[https://www.chef.io/inspec/][Chef InSpec]]
 
-Esstimated time to completion for environment setup: 5 to 15 minutes depending on the speed of your Internet connection.
+Estimated time to completion for environment setup: 5 to 15 minutes depending on the speed of your Internet connection.
 
 * Setup of the environment
 ** This repo
@@ -45,7 +45,7 @@ cd vault-operations && ls
 : Vagrantfile
 : vms
 
-** HashiCorp Enteprise tooling
+** HashiCorp Enterprise tooling
 First we'll need to download the Vault Enterprise and Consul Enterprise binaries from AWS S3. As part of your license entitlement you should have been provided with the following credential information:
 
 - AWS_ACCESS_KEY_ID
