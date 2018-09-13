@@ -13,8 +13,8 @@ trap onerr ERR
 [ ! -n "${DEBUG}" ] || set -x
 set -u
 
-: ${CONSUL_VERSION:="0.9.2"}
-: ${VAULT_VERSION:="0.8.1"}
+: ${CONSUL_VERSION:="1.1.2"}
+: ${VAULT_VERSION:="0.11.0"}
 
 : ${CONSUL_REMOTE_DIR:="s3://hc-enterprise-binaries/consul-enterprise/${CONSUL_VERSION}/"}
 : ${VAULT_REMOTE_DIR:="s3://hc-enterprise-binaries/vault-enterprise/${VAULT_VERSION}/"}
